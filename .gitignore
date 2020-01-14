@@ -1,3 +1,5 @@
+.idea
+*.pth
 debug*
 checkpoints/
 results/
