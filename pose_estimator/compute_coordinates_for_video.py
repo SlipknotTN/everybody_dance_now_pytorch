@@ -1,16 +1,20 @@
-import pose_utils
+import argparse
 import os
 import numpy as np
 
 from tensorflow.keras.models import load_model
 import skimage.transform as st
-import pandas as pd
 from tqdm import tqdm
-from numpy.random import shuffle
 from skimage.transform import resize
 from scipy.ndimage import gaussian_filter
 from skimage.io import imsave, imread
-from pose_utils import draw_pose_from_cords
+from pose_estimator.pose_utils import draw_pose_from_coords
+
+# RTX Fix
+# https://github.com/tensorflow/tensorflow/issues/24496
+# https://kobkrit.com/using-allow-growth-memory-option-in-tensorflow-and-keras-dc8c8081bc96
+import tensorflow as tf
+from tensorflow.keras.backend import set_session
 
 mapIdx = [[31,32], [39,40], [33,34], [35,36], [41,42], [43,44], [19,20], [21,22],
           [23,24], [25,26], [27,28], [29,30], [47,48], [49,50], [53,54], [51,52],
@@ -173,7 +177,7 @@ def compute_cordinates(heatmap_avg, paf_avg, oriImg, th1=0.1, th2=0.05):
 
 #def cordinates_from_image_file(image_name, model):
 #   oriImg = imread(image_name)[:, :, ::-1]  # B,G,R order
-def cordinates_from_image_file(image, model):
+def coordinates_from_image_file(image, model):
     oriImg = image[:, :, ::-1]
 
     multiplier = [x * boxsize / oriImg.shape[0] for x in scale_search]
@@ -199,20 +203,20 @@ def cordinates_from_image_file(image, model):
     pose_cords = compute_cordinates(heatmap_avg, paf_avg, oriImg=oriImg)
     return pose_cords
 
-def strip_frames(vdir, input, output, num=625):
-
-    reader = get_reader(os.path.join(vdir, input))
-    fps = reader.get_meta_data()['fps']
-    writer = get_writer(os.path.join(vdir, output), fps=fps)
-
-    count = 0
-    for im in reader:
-        count += 1
-        if count > num:
-            writer.append_data(im)
-
-    print(count)
-    writer.close()
+# def strip_frames(vdir, input, output, num=625):
+#
+#     reader = get_reader(os.path.join(vdir, input))
+#     fps = reader.get_meta_data()['fps']
+#     writer = get_writer(os.path.join(vdir, output), fps=fps)
+#
+#     count = 0
+#     for im in reader:
+#         count += 1
+#         if count > num:
+#             writer.append_data(im)
+#
+#     print(count)
+#     writer.close()
 
 
 # check if a given image contains full skeleton info
@@ -241,13 +245,30 @@ def check_validity(img, thres=70, keypoint_num=18):
     return _joint_num, mask
 
 
+def do_parsing():
+    parser = argparse.ArgumentParser(description='Extract pose prediction')
+    parser.add_argument('--src_images_dir', required=True, type=str, help='Source images directory (already resized)')
+    parser.add_argument('--dst_images_dir', required=True, type=str, help='Destination directory for pose predictions')
+    parser.add_argument('--dst_pose_file', required=True, type=str, help='Destination file for pose prediction')
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    img_dir = './datasets/train_B'  # Change this line into where your video frames are stored
-    pose_dir = img_dir.replace('train_B', 'train_A')
-    pose_npy_name = img_dir.replace('train_B', 'poses.npy')
-    if nor os.path.isdir(pose_dir):
+    args = do_parsing()
+    print(args)
+    img_dir = args.src_images_dir
+    pose_dir = args.dst_images_dir
+    pose_npy_name = args.dst_pose_file
+    if not os.path.isdir(pose_dir):
         os.mkdir(pose_dir)
-        
+
+    # RTX Fix
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+    config.log_device_placement = True  # to log device placement (on which device the operation ran)
+    sess = tf.Session(config=config)
+    set_session(sess)  # set this TensorFlow session as the default session for Keras
+
     model = load_model('./pose_estimator/pose_estimator.h5')
     img_list = os.listdir(img_dir)
     # get frame shape
@@ -256,10 +277,10 @@ if __name__ == "__main__":
     
     pose_cords = []
     for item in tqdm(img_list):
-        img = imread(os.path.join(img_dir, item)
-        cord = cordinates_from_image_file(img, model=model)
+        img = imread(os.path.join(img_dir, item))
+        cord = coordinates_from_image_file(img, model=model)
         pose_cords.append(cord)
-        color,_ = draw_pose_from_cords(cord, im_shape)
+        color,_ = draw_pose_from_coords(cord, im_shape)
         imsave(os.path.join(pose_dir, item), color)
     
     np.save(pose_npy_name, np.array(pose_cords, dtype=np.int))

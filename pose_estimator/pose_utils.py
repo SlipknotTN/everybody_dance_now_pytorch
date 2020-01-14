@@ -59,7 +59,7 @@ def cords_to_map(cords, img_size, sigma=6):
     return result
 
 
-def draw_pose_from_cords(pose_joints, img_size, radius=2, draw_joints=True):
+def draw_pose_from_coords(pose_joints, img_size, radius=2, draw_joints=True):
     colors = np.zeros(shape=img_size + (3, ), dtype=np.uint8)
     mask = np.zeros(shape=img_size, dtype=bool)
 
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     for index, row in df.iterrows():
         pose_cords = load_pose_cords_from_strings(row['keypoints_y'], row['keypoints_x'])
 
-        colors, mask = draw_pose_from_cords(pose_cords, (128, 64))
+        colors, mask = draw_pose_from_coords(pose_cords, (128, 64))
 
         mmm = produce_ma_mask(pose_cords, (128, 64)).astype(float)[..., np.newaxis].repeat(3, axis=-1)
         #print(mmm.shape)
