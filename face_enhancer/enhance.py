@@ -1,15 +1,11 @@
-import model
-import dataset
-from trainer import Trainer
+import face_enhancer.dataset
 
 import os
 
 import torch
-from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import numpy as np
 from PIL import Image
-from skimage.io import imsave
 from imageio import get_writer
 
 image_transforms = transforms.Compose([
@@ -47,8 +43,8 @@ if __name__ == '__main__':
     ckpt_dir = './checkpoints'
     result_dir = './results'
 
-    image_folder = dataset.ImageFolderDataset(dataset_dir, cache=os.path.join(dataset_dir, 'local.db'), is_test=True)
-    face_dataset = dataset.FaceCropDataset(image_folder, pose_name, image_transforms, crop_size=48)
+    image_folder = face_enhancer.dataset.ImageFolderDataset(dataset_dir, cache=os.path.join(dataset_dir, 'local.db'), is_test=True)
+    face_dataset = face_enhancer.dataset.FaceCropDataset(image_folder, pose_name, image_transforms, crop_size=48)
     length = len(face_dataset)
     
     path = 'dance_test_new_down2_res6'
